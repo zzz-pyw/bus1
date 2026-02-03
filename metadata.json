@@ -1,0 +1,5 @@
+{
+  "name": "BiliBus Gallery",
+  "description": "A lightweight, Bilibili-style movie gallery web application for browsing content with magnet integration.",
+  "requestFramePermissions": []
+}
