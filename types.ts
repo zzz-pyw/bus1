@@ -1,9 +1,11 @@
+
 export interface Movie {
-  id: string; // The specific movie ID (e.g., ABC-123)
+  id: string;
   date: string;
   title: string;
-  img: string; // URL to cover image
+  img: string;
   tags?: string[];
+  hasMagnet?: boolean; // 新增标记：是否有磁力链接
 }
 
 export interface MovieDetail extends Movie {
@@ -16,8 +18,10 @@ export interface MovieDetail extends Movie {
     name: string;
     url?: string;
     img?: string;
+    id?: string;
   }>;
   screencaps?: string[];
+  genre?: string[];
 }
 
 export interface Magnet {
@@ -38,4 +42,4 @@ export interface PaginationResponse {
   };
 }
 
-export type CategoryType = 'normal' | 'uncensored' | 'search' | 'star';
+export type CategoryType = 'normal' | 'uncensored' | 'search' | 'star' | 'genre';
