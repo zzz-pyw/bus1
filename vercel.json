@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://bus.wawj.dpdns.org/:path*"
+      "destination": "https://bus.wawj.dpdns.org/api/:path*"
     }
   ]
 }
