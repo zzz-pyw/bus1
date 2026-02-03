@@ -1,8 +1,8 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Movie, MovieDetail, Magnet } from '../types';
 import { api } from '../services/api';
-import { getProxyImage, copyToClipboard, getExternalLinks } from '../utils';
+import { getProxyImage, copyToClipboard, getExternalLinks, getFallbackImage, IMAGE_PLACEHOLDER } from '../utils';
 import { XIcon, CopyIcon, MagnetIcon, PlayIcon, LoaderIcon, SearchIcon } from './Icons';
 
 interface DetailModalProps {
@@ -18,6 +18,9 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
   const [loadingMagnets, setLoadingMagnets] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [activeImg, setActiveImg] = useState<string>('');
+  
+  // 用于主图的回退状态
+  const [mainImgRetry, setMainImgRetry] = useState(0);
 
   useEffect(() => {
     if (movie) {
@@ -29,6 +32,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
 
   const fetchDetail = async (id: string) => {
     setLoading(true);
+    setMainImgRetry(0);
     try {
       const data = await api.getMovieDetail(id);
       setDetail(data);
@@ -45,6 +49,24 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
     } catch (error) { console.error(error); } finally { setLoadingMagnets(false); }
   };
 
+  const handleMainImgError = () => {
+    if (mainImgRetry === 0 && movie) {
+      setActiveImg(getFallbackImage(movie.id, false));
+      setMainImgRetry(1);
+    } else if (mainImgRetry === 1) {
+      setActiveImg(IMAGE_PLACEHOLDER);
+      setMainImgRetry(2);
+    }
+  };
+
+  // 通用单次图片回退
+  const handleImgFallback = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = e.target as HTMLImageElement;
+    if (target.src !== IMAGE_PLACEHOLDER) {
+      target.src = IMAGE_PLACEHOLDER;
+    }
+  };
+
   if (!movie) return null;
 
   return (
@@ -56,9 +78,10 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
         <div className="w-full lg:w-3/5 bg-[#18191C] relative flex flex-col">
           <div className="flex-1 min-h-[300px] relative overflow-hidden flex items-center justify-center">
             <img 
-              src={getProxyImage(activeImg, 1200)} 
-              className="max-w-full max-h-full object-contain" 
+              src={activeImg.startsWith('http') ? getProxyImage(activeImg, 1200) : activeImg} 
+              className="max-w-full max-h-full object-contain transition-all duration-300" 
               alt="cover"
+              onError={handleMainImgError}
             />
           </div>
           {/* 剧照预览网格 */}
@@ -66,15 +89,17 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
             <div className="h-24 bg-black/50 p-2 flex gap-2 overflow-x-auto scrollbar-hide border-t border-white/10">
               <img 
                 src={getProxyImage(detail.img, 200)} 
-                onClick={() => setActiveImg(detail.img)}
-                className={`h-full aspect-video object-cover rounded cursor-pointer border-2 ${activeImg === detail.img ? 'border-[#FB7299]' : 'border-transparent opacity-50'}`}
+                onClick={() => { setActiveImg(detail.img); setMainImgRetry(0); }}
+                onError={handleImgFallback}
+                className={`h-full aspect-video object-cover rounded cursor-pointer border-2 transition-all ${activeImg === detail.img ? 'border-[#FB7299] opacity-100' : 'border-transparent opacity-50 hover:opacity-80'}`}
               />
               {detail.screencaps.map((cap, i) => (
                 <img 
                   key={i}
                   src={getProxyImage(cap, 300)} 
-                  onClick={() => setActiveImg(cap)}
-                  className={`h-full aspect-video object-cover rounded cursor-pointer border-2 ${activeImg === cap ? 'border-[#FB7299]' : 'border-transparent opacity-50'}`}
+                  onClick={() => { setActiveImg(cap); setMainImgRetry(0); }}
+                  onError={handleImgFallback}
+                  className={`h-full aspect-video object-cover rounded cursor-pointer border-2 transition-all ${activeImg === cap ? 'border-[#FB7299] opacity-100' : 'border-transparent opacity-50 hover:opacity-80'}`}
                 />
               ))}
             </div>
@@ -94,7 +119,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><XIcon className="w-6 h-6" /></button>
           </div>
 
-          {/* 演员标签 - 模仿脚本增加跳转 */}
+          {/* 演员标签 */}
           <div className="mb-8">
              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">出演艺人 (点击搜索)</h3>
              <div className="flex flex-wrap gap-2">
@@ -104,14 +129,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSear
                    onClick={() => { onSearchActor?.(actor.name); onClose(); }}
                    className="flex items-center gap-2 bg-gray-50 hover:bg-[#00AEEC]/10 border border-gray-100 px-3 py-1.5 rounded-full transition-all group"
                  >
-                   <img src={getProxyImage(actor.img || '', 100)} className="w-6 h-6 rounded-full object-cover" />
+                   <img 
+                    src={getProxyImage(actor.img || '', 100)} 
+                    onError={handleImgFallback}
+                    className="w-6 h-6 rounded-full object-cover" 
+                   />
                    <span className="text-sm font-bold text-gray-700 group-hover:text-[#00AEEC]">{actor.name}</span>
                  </button>
                )) || <span className="text-gray-400 text-xs italic">暂无艺人信息</span>}
              </div>
           </div>
 
-          {/* 外部参考工具箱 - 核心优化：取长补短 */}
+          {/* 外部参考工具箱 */}
           <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100">
              <h3 className="text-xs font-black text-gray-500 mb-3 flex items-center gap-2">
                <SearchIcon className="w-3 h-3" />
