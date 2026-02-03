@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Movie } from '../types';
-import { getProxyImage, getFallbackImage } from '../utils';
+import { getProxyImage, getFallbackImage, IMAGE_PLACEHOLDER } from '../utils';
 
 interface MovieCardProps {
   movie: Movie;
@@ -9,18 +9,26 @@ interface MovieCardProps {
 }
 
 export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
-  const [imgSrc, setImgSrc] = useState(getProxyImage(movie.img, 400));
-  const [hasError, setHasError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string>(getProxyImage(movie.img, 400));
+  const [retryCount, setRetryCount] = useState(0);
+
+  // 当外部 movie 改变时重置图片
+  useEffect(() => {
+    setImgSrc(getProxyImage(movie.img, 400));
+    setRetryCount(0);
+  }, [movie.img, movie.id]);
 
   const handleError = () => {
-    if (!hasError) {
-      setHasError(true);
-      // 第一次错误：尝试使用 JavDB 构造的备选路径
+    if (retryCount === 0) {
+      // 第一级失败：尝试官方备份路径
       setImgSrc(getFallbackImage(movie.id, true));
-    } else {
-      // 第二次错误：显示占位图
-      setImgSrc('https://wsrv.nl/?url=https://www.javbus.com/pics/thumb/placeholder.jpg');
+      setRetryCount(1);
+    } else if (retryCount === 1) {
+      // 第二级失败：显示最终占位图
+      setImgSrc(IMAGE_PLACEHOLDER);
+      setRetryCount(2);
     }
+    // retryCount === 2 时不再处理，防止死循环
   };
 
   return (
@@ -28,8 +36,8 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
       onClick={() => onClick(movie)}
       className="group bg-white rounded-2xl cursor-pointer transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl overflow-hidden border border-gray-100 flex flex-col h-full relative"
     >
-      {/* 状态标记 */}
-      {movie.date.includes('2026') && (
+      {/* 状态标记 - 逻辑优化：判断是否是今年或明年的片子 */}
+      {movie.date && (movie.date.includes('2025') || movie.date.includes('2026')) && (
         <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-[#FB7299] to-[#E25D85] text-white text-[10px] font-black px-2 py-0.5 rounded shadow-lg">
           NEW
         </div>
@@ -67,8 +75,10 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
         
         <div className="mt-auto flex items-center justify-between">
           <div className="flex gap-1">
-            <span className="px-2 py-0.5 bg-[#F4F5F7] text-gray-400 text-[9px] font-bold rounded-md">HD</span>
-            <span className="px-2 py-0.5 bg-[#F4F5F7] text-gray-400 text-[9px] font-bold rounded-md">磁力</span>
+            <span className="px-2 py-0.5 bg-[#F4F5F7] text-gray-400 text-[9px] font-bold rounded-md uppercase">HD</span>
+            {movie.hasMagnet !== false && (
+              <span className="px-2 py-0.5 bg-[#00AEEC]/10 text-[#00AEEC] text-[9px] font-bold rounded-md">磁力</span>
+            )}
           </div>
           <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-sm shadow-green-200"></div>
         </div>
