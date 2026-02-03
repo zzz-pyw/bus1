@@ -2,48 +2,39 @@
 import React, { useEffect, useState } from 'react';
 import { Movie, MovieDetail, Magnet } from '../types';
 import { api } from '../services/api';
-import { getProxyImage, copyToClipboard } from '../utils';
-import { XIcon, CopyIcon, MagnetIcon, PlayIcon, LoaderIcon } from './Icons';
+import { getProxyImage, copyToClipboard, getExternalLinks } from '../utils';
+import { XIcon, CopyIcon, MagnetIcon, PlayIcon, LoaderIcon, SearchIcon } from './Icons';
 
 interface DetailModalProps {
   movie: Movie | null;
   onClose: () => void;
+  onSearchActor?: (name: string) => void;
 }
 
-export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose }) => {
+export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose, onSearchActor }) => {
   const [detail, setDetail] = useState<MovieDetail | null>(null);
   const [magnets, setMagnets] = useState<Magnet[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMagnets, setLoadingMagnets] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [activeImg, setActiveImg] = useState<string>('');
 
   useEffect(() => {
     if (movie) {
       fetchDetail(movie.id);
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
     }
     return () => { document.body.style.overflow = 'unset'; };
   }, [movie]);
 
   const fetchDetail = async (id: string) => {
     setLoading(true);
-    setImgLoaded(false);
-    setDetail(null);
-    setMagnets([]);
     try {
       const data = await api.getMovieDetail(id);
       setDetail(data);
-      if (data.gid && data.uc) {
-        fetchMagnets(id, data.gid, data.uc);
-      }
-    } catch (error) {
-      console.error("加载详情失败", error);
-    } finally {
-      setLoading(false);
-    }
+      setActiveImg(data.img || movie?.img || '');
+      if (data.gid && data.uc) fetchMagnets(id, data.gid, data.uc);
+    } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
   const fetchMagnets = async (id: string, gid: string, uc: string) => {
@@ -51,168 +42,124 @@ export const DetailModal: React.FC<DetailModalProps> = ({ movie, onClose }) => {
     try {
       const data = await api.getMagnets(id, gid, uc);
       setMagnets(data);
-    } catch (error) {
-      console.error("加载磁力链接失败", error);
-    } finally {
-      setLoadingMagnets(false);
-    }
-  };
-
-  const handleCopy = (text: string, id: string) => {
-    copyToClipboard(text).then(success => {
-      if (success) {
-        setCopyStatus(id);
-        setTimeout(() => setCopyStatus(null), 2000);
-      }
-    });
+    } catch (error) { console.error(error); } finally { setLoadingMagnets(false); }
   };
 
   if (!movie) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-md transition-opacity" 
-        onClick={onClose}
-      />
-
-      <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-md">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative bg-white w-full max-w-6xl max-h-[92vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in zoom-in duration-300">
         
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 bg-white/80 hover:bg-white rounded-full text-gray-800 shadow-lg transition-all"
-        >
-          <XIcon className="w-5 h-5" />
-        </button>
-
-        {loading ? (
-          <div className="w-full h-96 flex flex-col items-center justify-center gap-3">
-            <LoaderIcon className="animate-spin text-[#FB7299] w-10 h-10" />
-            <p className="text-gray-400 animate-pulse">正在获取高清资源...</p>
+        {/* 左侧预览区 */}
+        <div className="w-full lg:w-3/5 bg-[#18191C] relative flex flex-col">
+          <div className="flex-1 min-h-[300px] relative overflow-hidden flex items-center justify-center">
+            <img 
+              src={getProxyImage(activeImg, 1200)} 
+              className="max-w-full max-h-full object-contain" 
+              alt="cover"
+            />
           </div>
-        ) : (
-          <>
-            <div className="w-full md:w-2/5 bg-gray-100 relative overflow-hidden group">
-              {!imgLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                  <LoaderIcon className="animate-spin text-gray-400" />
-                </div>
-              )}
+          {/* 剧照预览网格 */}
+          {detail?.screencaps && detail.screencaps.length > 0 && (
+            <div className="h-24 bg-black/50 p-2 flex gap-2 overflow-x-auto scrollbar-hide border-t border-white/10">
               <img 
-                src={getProxyImage(detail?.img || movie.img, 800)} 
-                alt={movie.title} 
-                onLoad={() => setImgLoaded(true)}
-                className={`w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                src={getProxyImage(detail.img, 200)} 
+                onClick={() => setActiveImg(detail.img)}
+                className={`h-full aspect-video object-cover rounded cursor-pointer border-2 ${activeImg === detail.img ? 'border-[#FB7299]' : 'border-transparent opacity-50'}`}
               />
+              {detail.screencaps.map((cap, i) => (
+                <img 
+                  key={i}
+                  src={getProxyImage(cap, 300)} 
+                  onClick={() => setActiveImg(cap)}
+                  className={`h-full aspect-video object-cover rounded cursor-pointer border-2 ${activeImg === cap ? 'border-[#FB7299]' : 'border-transparent opacity-50'}`}
+                />
+              ))}
             </div>
+          )}
+        </div>
 
-            <div className="w-full md:w-3/5 p-6 overflow-y-auto max-h-[90vh]">
-              <div className="mb-6">
-                <h2 className="text-xl md:text-2xl font-bold text-[#18191C] leading-tight mb-3">
-                  {detail?.title || movie.title}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-white bg-[#FB7299] px-2 py-0.5 rounded text-sm">
-                    {detail?.id || movie.id}
-                  </span>
-                  <span className="text-gray-500 text-sm">{detail?.date || movie.date}</span>
-                  {detail?.studio && (
-                    <span className="text-[#00AEEC] bg-[#00AEEC]/10 px-2 py-0.5 rounded text-sm font-medium">
-                      {detail.studio}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {detail?.actors && detail.actors.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest">演员阵容</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {detail.actors.map((actor, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full pl-1 pr-3 py-1 text-sm text-[#18191C] transition-colors cursor-default">
-                         <img 
-                           src={getProxyImage(actor.img || '', 100)} 
-                           alt={actor.name} 
-                           className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" 
-                         />
-                         <span className="font-medium">{actor.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                {/* 切换到更稳定的 .ai 域名 */}
-                <a 
-                  href={`https://missav.ai/search/${detail?.id || movie.id}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-[#18191C] hover:bg-black text-white py-3 rounded-xl font-bold transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
-                >
-                  <PlayIcon className="w-5 h-5 fill-current" />
-                  <span>MissAV 观看</span>
-                </a>
-                <a 
-                  href={`https://jable.tv/search/${detail?.id || movie.id}/`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-[#FB7299] hover:bg-[#E25D85] text-white py-3 rounded-xl font-bold transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
-                >
-                  <PlayIcon className="w-5 h-5 fill-current" />
-                  <span>Jable 观看</span>
-                </a>
-              </div>
-
-              <div className="border-t border-gray-100 pt-6">
-                <h3 className="flex items-center gap-2 text-lg font-bold text-[#18191C] mb-4">
-                  <MagnetIcon className="text-[#00AEEC] w-5 h-5" />
-                  磁力资源
-                  {loadingMagnets && <LoaderIcon className="animate-spin w-4 h-4 text-[#FB7299]" />}
-                </h3>
-
-                {magnets.length === 0 && !loadingMagnets ? (
-                  <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                    <p className="text-gray-400 text-sm">暂无直达链接，请通过上方在线平台观看</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {magnets.map((magnet) => (
-                      <div key={magnet.id} className="group bg-gray-50 hover:bg-white border border-transparent hover:border-[#00AEEC]/30 rounded-xl p-3 transition-all hover:shadow-md">
-                        <div className="flex justify-between items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-bold text-[#18191C] truncate mb-1 group-hover:text-[#00AEEC]">
-                              {magnet.name || "高清磁力链接 (点击右侧复制)"}
-                            </h4>
-                            <div className="flex items-center gap-3 text-[10px] font-bold">
-                              <span className="text-[#FB7299] bg-[#FB7299]/10 px-1.5 py-0.5 rounded">{magnet.size}</span>
-                              <span className="text-gray-400">{magnet.date}</span>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => handleCopy(magnet.link, magnet.id)}
-                            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold text-xs transition-all ${
-                              copyStatus === magnet.id 
-                                ? 'bg-green-500 text-white shadow-green-200' 
-                                : 'bg-white text-[#00AEEC] border border-gray-200 hover:border-[#00AEEC] shadow-sm'
-                            }`}
-                          >
-                            {copyStatus === magnet.id ? "已成功" : (
-                              <>
-                                <CopyIcon className="w-3.5 h-3.5" />
-                                复制
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+        {/* 右侧信息区 */}
+        <div className="w-full lg:w-2/5 p-6 md:p-8 overflow-y-auto bg-white flex flex-col">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <h2 className="text-2xl font-black text-[#18191C] leading-tight mb-2">{detail?.title || movie.title}</h2>
+              <div className="flex gap-2">
+                <span className="bg-[#FB7299]/10 text-[#FB7299] px-2 py-0.5 rounded text-xs font-black">{detail?.id || movie.id}</span>
+                <span className="text-gray-400 text-xs font-bold self-center">{detail?.date || movie.date}</span>
               </div>
             </div>
-          </>
-        )}
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><XIcon className="w-6 h-6" /></button>
+          </div>
+
+          {/* 演员标签 - 模仿脚本增加跳转 */}
+          <div className="mb-8">
+             <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">出演艺人 (点击搜索)</h3>
+             <div className="flex flex-wrap gap-2">
+               {detail?.actors?.map((actor, i) => (
+                 <button 
+                   key={i} 
+                   onClick={() => { onSearchActor?.(actor.name); onClose(); }}
+                   className="flex items-center gap-2 bg-gray-50 hover:bg-[#00AEEC]/10 border border-gray-100 px-3 py-1.5 rounded-full transition-all group"
+                 >
+                   <img src={getProxyImage(actor.img || '', 100)} className="w-6 h-6 rounded-full object-cover" />
+                   <span className="text-sm font-bold text-gray-700 group-hover:text-[#00AEEC]">{actor.name}</span>
+                 </button>
+               )) || <span className="text-gray-400 text-xs italic">暂无艺人信息</span>}
+             </div>
+          </div>
+
+          {/* 外部参考工具箱 - 核心优化：取长补短 */}
+          <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+             <h3 className="text-xs font-black text-gray-500 mb-3 flex items-center gap-2">
+               <SearchIcon className="w-3 h-3" />
+               联动外部站点 (看评论/查评分)
+             </h3>
+             <div className="grid grid-cols-2 gap-2">
+               {getExternalLinks(detail?.id || movie.id).map((link, i) => (
+                 <a 
+                   key={i} href={link.url} target="_blank" 
+                   className={`flex items-center justify-center py-2 px-3 rounded-xl text-white text-[10px] font-bold ${link.color} hover:opacity-90 transition-all shadow-sm active:scale-95`}
+                 >
+                   {link.name}
+                 </a>
+               ))}
+             </div>
+          </div>
+
+          {/* 磁力列表 */}
+          <div className="flex-1">
+            <h3 className="flex items-center gap-2 text-lg font-black text-[#18191C] mb-4">
+              <MagnetIcon className="text-[#00AEEC] w-5 h-5" />
+              磁力下载 (JavDB模式)
+              {loadingMagnets && <LoaderIcon className="animate-spin w-4 h-4 text-[#FB7299]" />}
+            </h3>
+            <div className="space-y-3">
+              {magnets.map((m) => (
+                <div key={m.id} className="bg-white border border-gray-100 rounded-2xl p-4 hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 pr-4">
+                       <p className="text-xs font-bold text-[#18191C] line-clamp-2 mb-2">{m.name}</p>
+                       <div className="flex gap-3 text-[10px] text-gray-400 font-bold uppercase">
+                         <span className="text-[#FB7299]">{m.size}</span>
+                         <span>{m.date}</span>
+                       </div>
+                    </div>
+                    <button 
+                      onClick={() => { copyToClipboard(m.link); setCopyStatus(m.id); setTimeout(()=>setCopyStatus(null), 2000); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${copyStatus === m.id ? 'bg-green-500 text-white' : 'bg-[#00AEEC]/10 text-[#00AEEC] hover:bg-[#00AEEC] hover:text-white'}`}
+                    >
+                      {copyStatus === m.id ? '已复制' : '复制磁力'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {!loadingMagnets && magnets.length === 0 && <p className="text-center py-8 text-gray-400 text-xs italic">暂无直达磁力，建议点击上方“外部链接”查找</p>}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
