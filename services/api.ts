@@ -1,11 +1,9 @@
 
 import { Movie, MovieDetail, Magnet, PaginationResponse } from '../types';
 
-// 基础路径设为 /api
 const BASE_URL = '/api';
 
 async function fetchClient<T>(endpoint: string): Promise<T> {
-  // endpoint 带有斜杠，例如 /movies，拼接后为 /api/movies
   const res = await fetch(`${BASE_URL}${endpoint}`);
   if (!res.ok) {
     throw new Error(`API 错误: ${res.statusText}`);
@@ -14,9 +12,10 @@ async function fetchClient<T>(endpoint: string): Promise<T> {
 }
 
 export const api = {
-  getMovies: async (page: number, type: 'normal' | 'uncensored' = 'normal'): Promise<PaginationResponse> => {
-    // 请求地址变为 /api/movies
-    const result = await fetchClient<any>(`/movies?page=${page}&type=${type}`);
+  getMovies: async (page: number, type: 'normal' | 'uncensored' = 'normal', filter: string = ''): Promise<PaginationResponse> => {
+    // 如果有过滤条件（如磁力），通常后端有特定的 endpoint，这里尝试拼接通用参数
+    const endpoint = `/movies?page=${page}&type=${type}${filter ? `&magnet=${filter}` : ''}`;
+    const result = await fetchClient<any>(endpoint);
     
     if (Array.isArray(result)) {
       return {
@@ -32,19 +31,26 @@ export const api = {
     return result;
   },
 
+  // 针对演员的专项搜索
+  getStarMovies: async (starId: string, page: number = 1): Promise<PaginationResponse> => {
+    return fetchClient<PaginationResponse>(`/star/${starId}?page=${page}`);
+  },
+
+  // 搜索逻辑增强
   searchMovies: async (keyword: string): Promise<Movie[]> => {
-    // 请求地址变为 /api/movies/search
+    // 首先尝试普通搜索
     const result = await fetchClient<any>(`/movies/search?keyword=${encodeURIComponent(keyword)}`);
-    return Array.isArray(result) ? result : (result.movies || []);
+    const movies = Array.isArray(result) ? result : (result.movies || []);
+    
+    // 如果结果为空且是中文，可能需要转换或调用演员库搜索（此处先返回结果，由 App 层处理展示）
+    return movies;
   },
 
   getMovieDetail: async (movieId: string): Promise<MovieDetail> => {
-    // 请求地址变为 /api/movies/:id
     return fetchClient<MovieDetail>(`/movies/${movieId}`);
   },
 
   getMagnets: async (movieId: string, gid: string, uc: string): Promise<Magnet[]> => {
-    // 请求地址变为 /api/magnets/:id
     return fetchClient<Magnet[]>(`/magnets/${movieId}?gid=${gid}&uc=${uc}`);
   }
 };
