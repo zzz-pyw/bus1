@@ -1,19 +1,19 @@
 
 // 智能图片处理
 export const getProxyImage = (url: string, width = 400): string => {
-  if (!url) return 'https://images.weserv.nl/?url=https://picsum.photos/400/600&w=400';
+  if (!url) return '';
   
-  // 处理 API 可能返回的相对路径
   let absoluteUrl = url;
   if (url.startsWith('//')) {
     absoluteUrl = 'https:' + url;
   } else if (!url.startsWith('http')) {
+    // 补全 JavBus 常见的图片路径
     absoluteUrl = 'https://www.javbus.com' + (url.startsWith('/') ? '' : '/') + url;
   }
 
-  // 使用 images.weserv.nl 代理，这是一个极其稳定的全球 CDN 代理
-  // l=9 加强压缩，af 忽略防盗链头部
-  return `https://images.weserv.nl/?url=${encodeURIComponent(absoluteUrl)}&w=${width}&fit=cover&errorredirect=https://picsum.photos/400/600`;
+  // 使用 wsrv.nl 代理，n=-1 表示不使用缓存，强制获取最新内容，af 忽略防盗链
+  // 移除之前的 errorredirect，防止显示随机风景图
+  return `https://wsrv.nl/?url=${encodeURIComponent(absoluteUrl)}&w=${width}&fit=cover&n=-1`;
 };
 
 export const truncate = (str: string, length: number) => {
@@ -23,7 +23,6 @@ export const truncate = (str: string, length: number) => {
 
 export const copyToClipboard = async (text: string) => {
   try {
-    // 兼容性更好的复制方法
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
       return true;
@@ -32,14 +31,9 @@ export const copyToClipboard = async (text: string) => {
       textArea.value = text;
       document.body.appendChild(textArea);
       textArea.select();
-      try {
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        return true;
-      } catch (err) {
-        document.body.removeChild(textArea);
-        return false;
-      }
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return true;
     }
   } catch (err) {
     return false;
