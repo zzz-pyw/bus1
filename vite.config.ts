@@ -10,7 +10,8 @@ export default defineConfig({
       '/api': {
         target: 'https://bus.wawj.dpdns.org',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // 不再 rewrite 掉 /api，因为服务器接口本身带 /api
+        rewrite: (path) => path
       },
     },
   },
