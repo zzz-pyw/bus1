@@ -1,9 +1,19 @@
 
-// 使用 wsrv.nl 绕过防盗链，n=-1 表示不缓存（有时更稳）
+// 智能图片处理
 export const getProxyImage = (url: string, width = 400): string => {
-  if (!url) return 'https://picsum.photos/300/400?blur=2';
-  // 转换为 wsrv.nl 代理地址
-  return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=${width}&q=80&output=webp&n=-1`;
+  if (!url) return 'https://images.weserv.nl/?url=https://picsum.photos/400/600&w=400';
+  
+  // 处理 API 可能返回的相对路径
+  let absoluteUrl = url;
+  if (url.startsWith('//')) {
+    absoluteUrl = 'https:' + url;
+  } else if (!url.startsWith('http')) {
+    absoluteUrl = 'https://www.javbus.com' + (url.startsWith('/') ? '' : '/') + url;
+  }
+
+  // 使用 images.weserv.nl 代理，这是一个极其稳定的全球 CDN 代理
+  // l=9 加强压缩，af 忽略防盗链头部
+  return `https://images.weserv.nl/?url=${encodeURIComponent(absoluteUrl)}&w=${width}&fit=cover&errorredirect=https://picsum.photos/400/600`;
 };
 
 export const truncate = (str: string, length: number) => {
@@ -13,10 +23,25 @@ export const truncate = (str: string, length: number) => {
 
 export const copyToClipboard = async (text: string) => {
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
+    // 兼容性更好的复制方法
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return true;
+      } catch (err) {
+        document.body.removeChild(textArea);
+        return false;
+      }
+    }
   } catch (err) {
-    console.error('复制失败: ', err);
     return false;
   }
 };
