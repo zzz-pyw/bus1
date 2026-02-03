@@ -1,21 +1,27 @@
 
+// 统一占位图地址
+export const IMAGE_PLACEHOLDER = 'https://wsrv.nl/?url=https://www.javbus.com/pics/thumb/placeholder.jpg&w=400&fit=cover';
+
 // 智能图片处理
-export const getProxyImage = (url: string, width = 600): string => {
-  if (!url) return '';
+export const getProxyImage = (url: string | undefined, width = 600): string => {
+  if (!url || url.trim() === '') return IMAGE_PLACEHOLDER;
+  
   let absoluteUrl = url;
   if (url.startsWith('//')) {
     absoluteUrl = 'https:' + url;
   } else if (!url.startsWith('http')) {
+    // 补全 JavBus 相对路径
     absoluteUrl = 'https://www.javbus.com' + (url.startsWith('/') ? '' : '/') + url;
   }
+  
+  // 使用 wsrv.nl 代理解决防盗链和尺寸问题
   // af=忽略防盗链, n=-1不缓存保证最新
   return `https://wsrv.nl/?url=${encodeURIComponent(absoluteUrl)}&w=${width}&fit=cover&af&n=-1`;
 };
 
 // 备用图片逻辑：当主封面加载失败时，尝试根据番号构造官方路径
-// Fix: Added missing export for getFallbackImage required by components/MovieCard.tsx
 export const getFallbackImage = (id: string, isThumb = true): string => {
-  if (!id) return '';
+  if (!id) return IMAGE_PLACEHOLDER;
   const folder = isThumb ? 'thumb' : 'cover';
   // JavBus 的图片资源通常可以通过番号小写化构造
   const fallbackUrl = `https://www.javbus.com/pics/${folder}/${id.toLowerCase()}.jpg`;
