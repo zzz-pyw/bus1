@@ -5,7 +5,7 @@ import { MovieCard } from './components/MovieCard';
 import { DetailModal } from './components/DetailModal';
 import { api } from './services/api';
 import { Movie, CategoryType } from './types';
-import { LoaderIcon, MagnetIcon } from './components/Icons';
+import { LoaderIcon, MagnetIcon, CalendarIcon, XIcon, FilterIcon } from './components/Icons';
 
 function App() {
   const [category, setCategory] = useState<CategoryType>('normal');
@@ -18,13 +18,36 @@ function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showOnlyMagnets, setShowOnlyMagnets] = useState(false);
+  
+  // Date filter state
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   const loaderRef = useRef<HTMLDivElement>(null);
 
+  // Filter movies client-side based on loaded set
   const displayedMovies = useMemo(() => {
-    if (!showOnlyMagnets) return movies;
-    return movies.filter(m => m.hasMagnet !== false); 
-  }, [movies, showOnlyMagnets]);
+    let list = movies;
+    
+    if (showOnlyMagnets) {
+      list = list.filter(m => m.hasMagnet !== false); 
+    }
+    
+    if (startDate) {
+      list = list.filter(m => m.date >= startDate);
+    }
+    
+    if (endDate) {
+      list = list.filter(m => m.date <= endDate);
+    }
+    
+    return list;
+  }, [movies, showOnlyMagnets, startDate, endDate]);
+
+  const clearDateFilters = () => {
+    setStartDate('');
+    setEndDate('');
+  };
 
   // 加载数据核心函数
   const loadData = useCallback(async (pageNum: number, cat: CategoryType, query?: string) => {
@@ -121,24 +144,59 @@ function App() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
+        {/* Filter Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
           <h1 className="text-2xl font-black text-[#18191C] flex items-center gap-3">
             {isSearching ? `搜索: "${searchQuery}"` : (category === 'uncensored' ? '无码影片' : '最新发布')}
             <span className="text-xs font-bold text-gray-400 bg-white px-2 py-1 rounded-full border border-gray-100">{displayedMovies.length} 结果</span>
           </h1>
 
-          <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
-            <label className="flex items-center cursor-pointer space-x-3 select-none">
-              <div className="flex items-center gap-1.5">
-                <MagnetIcon className={`w-4 h-4 ${showOnlyMagnets ? 'text-[#00AEEC]' : 'text-gray-300'}`} />
-                <span className={`text-xs font-black ${showOnlyMagnets ? 'text-[#00AEEC]' : 'text-gray-400'}`}>仅看磁力</span>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            {/* Date Range Picker */}
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
+              <CalendarIcon className="w-4 h-4 text-gray-400" />
+              <div className="flex items-center gap-1">
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-gray-600 focus:outline-none cursor-pointer"
+                  placeholder="开始日期"
+                />
+                <span className="text-gray-300 mx-1">至</span>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-transparent text-xs font-bold text-gray-600 focus:outline-none cursor-pointer"
+                  placeholder="结束日期"
+                />
               </div>
-              <div className="relative">
-                <input type="checkbox" className="sr-only" checked={showOnlyMagnets} onChange={() => setShowOnlyMagnets(!showOnlyMagnets)} />
-                <div className={`block w-10 h-5 rounded-full transition-colors ${showOnlyMagnets ? 'bg-[#00AEEC]' : 'bg-gray-200'}`}></div>
-                <div className={`absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform duration-300 shadow-md ${showOnlyMagnets ? 'transform translate-x-5' : ''}`}></div>
-              </div>
-            </label>
+              {(startDate || endDate) && (
+                <button 
+                  onClick={clearDateFilters}
+                  className="ml-2 p-1 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
+                  title="清除日期过滤"
+                >
+                  <XIcon className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Magnet Toggle */}
+            <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100 h-full min-h-[42px]">
+              <label className="flex items-center cursor-pointer space-x-3 select-none">
+                <div className="flex items-center gap-1.5">
+                  <MagnetIcon className={`w-4 h-4 ${showOnlyMagnets ? 'text-[#00AEEC]' : 'text-gray-300'}`} />
+                  <span className={`text-xs font-black ${showOnlyMagnets ? 'text-[#00AEEC]' : 'text-gray-400'}`}>仅看磁力</span>
+                </div>
+                <div className="relative">
+                  <input type="checkbox" className="sr-only" checked={showOnlyMagnets} onChange={() => setShowOnlyMagnets(!showOnlyMagnets)} />
+                  <div className={`block w-10 h-5 rounded-full transition-colors ${showOnlyMagnets ? 'bg-[#00AEEC]' : 'bg-gray-200'}`}></div>
+                  <div className={`absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform duration-300 shadow-md ${showOnlyMagnets ? 'transform translate-x-5' : ''}`}></div>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -164,8 +222,24 @@ function App() {
         {/* 空结果 */}
         {!loading && displayedMovies.length === 0 && (
           <div className="text-center py-40 bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
-             <h3 className="text-xl font-black text-gray-300 mb-4">空空如也，换个关键词搜搜看？</h3>
-             <button onClick={()=>handleCategoryChange('normal')} className="bg-[#FB7299] text-white px-10 py-3 rounded-2xl font-black shadow-xl shadow-[#FB7299]/20">回首页</button>
+             <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+               <FilterIcon className="w-10 h-10 text-gray-200" />
+             </div>
+             <h3 className="text-xl font-black text-[#18191C] mb-2">
+               {(startDate || endDate) ? '所选日期范围内无影片' : '空空如也'}
+             </h3>
+             <p className="text-gray-400 text-sm mb-6 px-10">试试调整日期范围或者换个关键词搜搜看？</p>
+             <div className="flex gap-4 justify-center">
+               {(startDate || endDate) && (
+                 <button 
+                  onClick={clearDateFilters} 
+                  className="bg-white border border-gray-200 text-gray-600 px-8 py-3 rounded-2xl font-black text-sm shadow-sm hover:bg-gray-50 transition-all"
+                 >
+                   清除日期
+                 </button>
+               )}
+               <button onClick={()=>handleCategoryChange('normal')} className="bg-[#FB7299] text-white px-8 py-3 rounded-2xl font-black text-sm shadow-xl shadow-[#FB7299]/20 hover:-translate-y-1 transition-all">返回首页</button>
+             </div>
           </div>
         )}
       </main>
